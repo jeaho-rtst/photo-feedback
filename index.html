@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>사진 보정 피드백</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<nav id="sidebar">
+  <div class="brand" id="brand">사진 보정<br><span>피드백</span></div>
+  <button class="nav-btn active" data-view="index" id="nav-index">사진 인덱스</button>
+  <button class="nav-btn" data-view="compare" id="nav-compare">비교 · 피드백</button>
+  <div class="nav-spacer"></div>
+  <div class="nav-stats" id="nav-stats"></div>
+  <div class="save-status" id="save-status"></div>
+  <button class="nav-sub" id="btn-export">피드백 내보내기 (JSON)</button>
+  <button class="nav-sub" id="btn-import">피드백 가져오기</button>
+  <input type="file" id="import-file" accept="application/json" hidden>
+</nav>
+
+<main id="main">
+  <!-- ===== 인덱스 페이지 ===== -->
+  <section id="view-index" class="view active">
+    <header class="toolbar">
+      <h1>사진 인덱스 <small id="index-count"></small></h1>
+      <label class="chk"><input type="checkbox" id="filter-fb"> 피드백 있는 사진만</label>
+      <label class="chk"><input type="checkbox" id="filter-crop"> 크롭된 사진만</label>
+      <span class="toolbar-note">섬네일은 <span data-label="after">보정본</span>입니다. 클릭하면 비교 화면으로 이동합니다.</span>
+    </header>
+    <div id="grid" class="grid"></div>
+  </section>
+
+  <!-- ===== 비교 · 피드백 페이지 ===== -->
+  <section id="view-compare" class="view">
+    <header class="toolbar compare-bar">
+      <button class="icon-btn" id="btn-prev" title="이전 사진 (←)">‹</button>
+      <div class="photo-title">
+        <strong id="photo-name">—</strong>
+        <small id="photo-pos"></small>
+        <span class="badge crop-badge" id="crop-badge" hidden title="보정본이 크롭되어 있어, 보정 전 사진의 해당 영역에 맞춰 정렬해 표시합니다">크롭됨</span>
+      </div>
+      <button class="icon-btn" id="btn-next" title="다음 사진 (→)">›</button>
+
+      <div class="seg" id="mode-seg">
+        <button data-mode="side" class="active">나란히 보기</button>
+        <button data-mode="overlay">겹쳐보기</button>
+      </div>
+
+      <div class="zoom-ctl">
+        <span>줌</span>
+        <input type="range" id="zoom" min="0" max="100" value="0" step="0.5">
+        <output id="zoom-out">100%</output>
+        <button class="small-btn" id="btn-fit" title="화면에 맞추기 (0)">맞춤</button>
+      </div>
+
+      <div class="overlay-ctl" id="overlay-ctl" hidden>
+        <span><span data-label="after">보정본</span> 불투명도</span>
+        <input type="range" id="opacity" min="0" max="100" value="50">
+        <output id="opacity-out">50%</output>
+        <button class="small-btn toggle" id="btn-blink" title="보정 전/후를 번갈아 보여줍니다">깜빡임</button>
+        <button class="small-btn toggle" id="btn-diff" title="두 사진의 차이만 밝게 표시합니다 (같은 부분은 검게)">차이 강조</button>
+      </div>
+
+      <button class="small-btn toggle active" id="btn-pins">피드백 보이기</button>
+    </header>
+
+    <div id="viewer" class="viewer side">
+      <div class="pane" data-side="before">
+        <div class="pane-label" data-label="before">보정 전</div>
+        <div class="stage"><img class="img-before" alt="보정 전" draggable="false"><div class="pins"></div></div>
+      </div>
+      <div class="pane" data-side="after">
+        <div class="pane-label" data-label="after">보정본</div>
+        <div class="stage"><img class="img-after" alt="보정본" draggable="false"><div class="pins"></div></div>
+      </div>
+      <div class="pane overlay-pane" data-side="overlay">
+        <div class="pane-label">겹쳐보기 <em id="overlay-hint"></em></div>
+        <div class="stage"><img class="img-before" alt="보정 전" draggable="false"><img class="img-after" alt="보정본" draggable="false"><div class="pins"></div></div>
+      </div>
+      <div class="hint" id="hint">사진을 클릭하면 그 위치에 피드백을 남길 수 있습니다 · 드래그로 이동 · 트랙패드 핀치/Ctrl+휠로 확대</div>
+    </div>
+
+    <section class="fb-list-wrap">
+      <h2>피드백 목록 <small id="fb-count"></small></h2>
+      <ol id="fb-list" class="fb-list"></ol>
+      <p class="empty" id="fb-empty">아직 피드백이 없습니다. 사진 위의 고치고 싶은 부분을 클릭해 보세요.</p>
+    </section>
+  </section>
+</main>
+
+<!-- 클릭 지점에 뜨는 "피드백 남기기" 버튼 -->
+<div id="add-popup" class="popup" hidden>
+  <button id="btn-add-fb">피드백 남기기</button>
+</div>
+
+<!-- 피드백 편집/보기 팝오버 -->
+<div id="fb-popover" class="popover" hidden>
+  <div class="pop-head"><span id="pop-title">피드백</span><button class="x" id="pop-close" title="닫기 (Esc)">×</button></div>
+  <div id="pop-view">
+    <pre id="pop-text"></pre>
+    <div class="pop-actions">
+      <button id="pop-edit">수정</button>
+      <button id="pop-delete" class="danger">삭제</button>
+    </div>
+  </div>
+  <div id="pop-edit-form" hidden>
+    <textarea id="pop-textarea" rows="4" placeholder="수정 요청 내용을 적어주세요. 줄바꿈은 Enter, 저장은 ⌘/Ctrl+Enter"></textarea>
+    <div class="pop-actions">
+      <button id="pop-save" class="primary">저장</button>
+      <button id="pop-cancel">취소</button>
+    </div>
+  </div>
+</div>
+
+<script src="photos.js"></script>
+<script src="data/feedback.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

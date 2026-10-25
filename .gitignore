@@ -1,0 +1,15 @@
+# 생성물 (tools/build_assets.py 가 만든다)
+img/
+photos.js
+photos.json
+# 피드백 데이터 (serve.py 가 만든다) — 사용자 데이터이므로 리포에 넣지 않는다
+data/
+# OS / 에디터
+.DS_Store
+._*
+Thumbs.db
+desktop.ini
+__pycache__/
+*.pyc
+.vscode/
+.idea/
