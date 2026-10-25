@@ -11,6 +11,12 @@ const STORE_KEY = 'wedding-photo-feedback:v1';
 const MAX_ZOOM = 8;
 const PHOTOS = (window.PHOTOS && window.PHOTOS.photos) || [];
 const LABELS = Object.assign({ before: '보정 전', after: '보정본' }, window.PHOTOS && window.PHOTOS.labels);
+const PATHS = Object.assign({ thumb: 'img/thumb', before: 'img/before', after: 'img/after' }, window.PHOTOS && window.PHOTOS.paths);
+const TITLE = (window.PHOTOS && window.PHOTOS.title) || '';
+/* 읽기 전용: 업체 전달용으로 내보낸 뷰어 (photos.js 에 readonly:true). 편집 UI 는 CSS(.readonly [data-edit]) 로 숨기고,
+ * 상태 변경은 store 의 mutator 입구 한 곳에서 막는다. */
+const READONLY = !!(window.PHOTOS && window.PHOTOS.readonly);
+if (READONLY) document.body.classList.add('readonly');
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
 
@@ -25,14 +31,16 @@ const store = {
   mode: 'local', saveTimer: null, status: '',
   load() {
     let local = null;
-    try { const raw = localStorage.getItem(STORE_KEY); if (raw) local = JSON.parse(raw); } catch (e) { console.warn('저장소 읽기 실패', e); }
     const shared = window.FEEDBACK_DATA;
+    if (READONLY) { this.data = shared || this.data; if (!this.data.photos) this.data.photos = {}; return; }
+    try { const raw = localStorage.getItem(STORE_KEY); if (raw) local = JSON.parse(raw); } catch (e) { console.warn('저장소 읽기 실패', e); }
     // 공유 파일과 브라우저 사본 중 더 최근에 저장된 것을 사용
     if (shared && (!local || (shared.updated || '') >= (local.updated || ''))) this.data = shared;
     else if (local) this.data = local;
     if (!this.data.photos) this.data.photos = {};
   },
   async connect() {
+    if (READONLY) return;
     if (location.protocol !== 'http:' && location.protocol !== 'https:') { this.setStatus('local'); return; }
     try {
       const r = await fetch('/api/feedback', { cache: 'no-store' });
@@ -48,6 +56,7 @@ const store = {
     } catch (e) { this.setStatus('local'); }
   },
   save() {
+    if (READONLY) return;
     this.data.updated = new Date().toISOString();
     try { localStorage.setItem(STORE_KEY, JSON.stringify(this.data)); } catch (e) { console.warn(e); }
     if (this.mode === 'server') { clearTimeout(this.saveTimer); this.saveTimer = setTimeout(() => this.push(), 300); }
@@ -67,12 +76,14 @@ const store = {
     const text = { server: '파일에 자동 저장 중 (data/feedback.json)', saving: '저장하는 중…',
       error: '파일 저장 실패: ' + (msg || '') + ' — serve.py 가 실행 중인지 확인', local: '이 브라우저에만 저장됨 — 다른 PC 와 공유하려면 serve.py 로 실행하세요' }[s];
     el.textContent = text; el.className = 'save-status ' + s;
-    $('#btn-export').hidden = $('#btn-import').hidden = false;
+    const zipBtn = $('#btn-zip');
+    zipBtn.disabled = s === 'local';
+    zipBtn.title = s === 'local' ? 'file:// 로 연 상태에서는 내보낼 수 없습니다. serve.py 로 띄운 주소에서 열어 주세요.' : '';
   },
   list(name) { return this.data.photos[name] || []; },
-  add(name, fb) { (this.data.photos[name] ||= []).push(fb); this.save(); },
-  update(name, id, text) { const f = this.list(name).find(f => f.id === id); if (f) { f.text = text; f.updated = new Date().toISOString(); this.save(); } },
-  remove(name, id) { this.data.photos[name] = this.list(name).filter(f => f.id !== id); if (!this.data.photos[name].length) delete this.data.photos[name]; this.save(); },
+  add(name, fb) { if (READONLY) return; (this.data.photos[name] ||= []).push(fb); this.save(); },
+  update(name, id, text) { if (READONLY) return; const f = this.list(name).find(f => f.id === id); if (f) { f.text = text; f.updated = new Date().toISOString(); this.save(); } },
+  remove(name, id) { if (READONLY) return; this.data.photos[name] = this.list(name).filter(f => f.id !== id); if (!this.data.photos[name].length) delete this.data.photos[name]; this.save(); },
   total() { return Object.values(this.data.photos).reduce((n, a) => n + a.length, 0); },
 };
 store.load();
@@ -114,7 +125,7 @@ function renderGrid() {
     shown++;
     const card = document.createElement('div');
     card.className = 'card';
-    card.innerHTML = `<div class="thumb"><img loading="lazy" src="img/thumb/${encodeURIComponent(p.name)}" alt="${p.name}"></div>
+    card.innerHTML = `<div class="thumb"><img loading="lazy" src="${PATHS.thumb}/${encodeURIComponent(p.name)}" alt="${p.name}"></div>
       <div class="meta"><span class="num">${i + 1}</span><span class="name">${p.name}</span>
       ${p.cropped ? `<span class="badge crop-badge" title="${LABELS.after}이(가) 크롭됨">크롭</span>` : ''}
       ${n ? `<span class="badge fb">${n}</span>` : ''}</div>`;
@@ -128,7 +139,7 @@ $('#filter-fb').addEventListener('change', renderGrid);
 $('#filter-crop').addEventListener('change', renderGrid);
 function renderStats() {
   const photosWithFb = Object.keys(store.data.photos).length;
-  $('#nav-stats').innerHTML = `사진 ${PHOTOS.length}장<br>피드백 ${store.total()}건 · ${photosWithFb}장`;
+  $('#nav-stats').innerHTML = `사진 ${PHOTOS.length}장<br>피드백 ${store.total()}건 · ${photosWithFb}장` + (READONLY ? '<br><span class="ro-badge">읽기 전용</span>' : '');
 }
 
 /* ---------------- 비교 뷰어 ---------------- */
@@ -145,7 +156,7 @@ function openPhoto(i) {
   $('#photo-name').textContent = photo.name;
   $('#photo-pos').textContent = `${i + 1} / ${PHOTOS.length}`;
   $('#crop-badge').hidden = !photo.cropped;
-  const b = 'img/before/' + encodeURIComponent(photo.name), a = 'img/after/' + encodeURIComponent(photo.name);
+  const b = PATHS.before + '/' + encodeURIComponent(photo.name), a = PATHS.after + '/' + encodeURIComponent(photo.name);
   $$('.img-before', viewer).forEach(img => img.src = b);
   $$('.img-after', viewer).forEach(img => img.src = a);
   view.z = 1; view.cx = view.cy = .5;
@@ -253,7 +264,7 @@ panes.forEach(pane => {
     if (wasDrag) return;
     closePopover();
     const { u, v } = toCanvas(pane, e.clientX, e.clientY);
-    if (u < 0 || u > 1 || v < 0 || v > 1) { hideAddPopup(); return; }
+    if (READONLY || u < 0 || u > 1 || v < 0 || v > 1) { hideAddPopup(); return; }
     showAddPopup(u, v, pane);
   });
   pane.addEventListener('pointercancel', () => { down = null; dragging = false; pane.classList.remove('dragging'); });
@@ -373,7 +384,7 @@ function openPopover(fb, pos, isNew, nearPane) {
   const idx = store.list(photo.name).findIndex(f => f.id === fb.id);
   $('#pop-title').textContent = isNew ? '새 피드백' : `피드백 #${idx + 1}`;
   pop.hidden = false;
-  setEditing(isNew || !fb.text);
+  setEditing(!READONLY && (isNew || !fb.text));
   const pane = anchorPane(nearPane), { x, y } = toScreen(pane, pos.u, pos.v);
   const w = 320, h = pop.offsetHeight || 180;
   // 오른쪽에 자리가 없으면 핀의 왼쪽에 띄운다 (핀을 가리지 않도록)
@@ -426,7 +437,7 @@ function renderList() {
     li.className = 'fb-item' + (activeId === fb.id ? ' active' : '');
     const when = new Date(fb.updated || fb.created).toLocaleString('ko-KR', { dateStyle: 'short', timeStyle: 'short' });
     li.innerHTML = `<span class="dot">${i + 1}</span><div class="txt"></div>
-      <div class="acts"><button data-act="edit">수정</button><button data-act="del" class="danger">삭제</button></div>`;
+      <div class="acts" data-edit><button data-act="edit">수정</button><button data-act="del" class="danger">삭제</button></div>`;
     const txt = $('.txt', li); txt.textContent = fb.text;
     txt.insertAdjacentHTML('beforeend', `<small>${when}${fb.updated ? ' 수정' : ''}</small>`);
     li.addEventListener('click', e => {
@@ -435,7 +446,7 @@ function renderList() {
       // 핀이 보이도록 중심 이동 후 팝오버 열기
       view.cx = fb.x; view.cy = fb.y; layout();
       openPopover(fb, { u: fb.x, v: fb.y }, false);
-      if (act === 'edit') setEditing(true);
+      if (act === 'edit' && !READONLY) setEditing(true);
     });
     fbList.appendChild(li);
   });
@@ -498,7 +509,36 @@ $('#import-file').addEventListener('change', async e => {
   } catch (err) { alert('가져오기 실패: ' + err.message); }
 });
 
+/* ---------------- 업체 전달용 ZIP 내보내기 (export.js) ---------------- */
+const zipModal = $('#zip-modal');
+$('#btn-zip').addEventListener('click', () => {
+  if (!window.PhotoExport) { alert('export.js 를 불러오지 못했습니다.'); return; }
+  $('#zip-progress').hidden = true; $('#zip-result').hidden = true; $('#zip-start').disabled = false;
+  const n = Object.keys(store.data.photos).length, t = store.total();
+  $('#zip-summary').textContent = `피드백 있는 사진 ${n}장 · ${t}건 (전체 ${PHOTOS.length}장)`;
+  zipModal.hidden = false;
+});
+$('#zip-close').addEventListener('click', () => zipModal.hidden = true);
+$('#zip-start').addEventListener('click', async () => {
+  const scope = $('input[name=zip-scope]:checked').value;
+  const bar = $('#zip-bar'), label = $('#zip-phase');
+  $('#zip-progress').hidden = false; $('#zip-start').disabled = true;
+  try {
+    const res = await window.PhotoExport.run({
+      photos: PHOTOS, feedback: store.data.photos, labels: LABELS, title: TITLE || 'photo-feedback', scope,
+      onProgress: ({ phase, done, total }) => { label.textContent = `${phase} ${done}/${total}`; bar.style.width = (total ? done / total * 100 : 0) + '%'; },
+    });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(res.blob); a.download = res.filename; a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 60000);
+    $('#zip-result').hidden = false;
+    $('#zip-result').textContent = `${res.filename} — 사진 ${res.stats.photos}장, 피드백 ${res.stats.feedback}건, ${(res.stats.bytes / 1048576).toFixed(1)} MB. 압축을 풀고 readme.html 또는 index.html 을 열어 확인하세요.`;
+  } catch (e) {
+    $('#zip-result').hidden = false; $('#zip-result').textContent = '실패: ' + e.message;
+  } finally { $('#zip-start').disabled = false; }
+});
+
 /* ---------------- 시작 ---------------- */
+if (TITLE) { document.title = TITLE + ' — 보정 피드백'; const b = $('#brand'); b.textContent = TITLE; b.appendChild(document.createElement('br')); const s = document.createElement('span'); s.textContent = '보정 피드백'; b.appendChild(s); }
 $$('[data-label]').forEach(el => el.textContent = LABELS[el.dataset.label]);
 $$('.img-before').forEach(i => i.alt = LABELS.before); $$('.img-after').forEach(i => i.alt = LABELS.after);
 $('#overlay-hint').textContent = `— 아래: ${LABELS.before} / 위: ${LABELS.after}`;

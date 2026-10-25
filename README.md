@@ -17,7 +17,9 @@ on specific spots. Pure-Python server (stdlib only), vanilla JS front-end, no bu
 - **위치 기반 피드백**: 사진을 클릭 → "피드백 남기기" → 줄바꿈 가능한 메모. 붉은 번호 핀으로 표시되고 클릭하면 보기/수정/삭제.
   하단 목록에서도 수정/삭제, 핀 보이기/숨기기 토글
 - **저장**: 서버 모드에서는 `data/feedback.json` 파일에 자동 저장 (공유 폴더·NAS 에 두면 여러 PC 에서 이어서 작업).
-  `file://` 로 그냥 열면 브라우저 localStorage 에만 저장. JSON 내보내기/가져오기 지원
+  `file://` 로 그냥 열면 브라우저 localStorage 에만 저장. JSON 백업/가져오기 지원
+- **업체 전달용 내보내기 (ZIP)**: 사이드바 버튼 하나로 업체에 보낼 ZIP 을 브라우저에서 만듭니다 (서버 쪽 이미지 라이브러리 불필요).
+  읽기 전용 비교 뷰어 + `feedback/` 폴더에 핀·번호·비교 크롭·메모를 그려 넣은 이미지 + `피드백 목록.txt`(체크리스트) + readme
 
 ## 빠른 시작
 
@@ -55,6 +57,22 @@ python3 "/volume1/photos/wedding/photo-feedback/serve.py" --host 0.0.0.0 --no-op
 이후 LAN 의 어느 기기에서든 `http://<NAS IP>:8765/photo-feedback/`. 인증이 없으니 **인터넷에 직접 노출하지 마세요.**
 섬네일 생성(`build_assets.py`)은 Pillow/numpy 가 필요하므로 PC 에서 돌리고, 결과물이 같은 공유 폴더에 떨어지게 하면 됩니다.
 
+## 업체에 보내기
+
+사이드바 맨 아래 **업체 전달용 내보내기 (ZIP)** → 범위 선택(기본: 피드백 있는 사진만) → 다운로드. 서버 모드(`serve.py`)에서만 동작합니다.
+받은 쪽은 압축을 풀고 `readme.html` 을 열면 됩니다. ZIP 안은 이렇습니다.
+
+```
+readme.html / readme.txt   안내 + 수정 요청 목록
+피드백 목록.txt             사진별 메모 전체 (체크박스, UTF-8 BOM/CRLF → Windows 메모장 OK)
+feedback/<이름>.jpg        보정본 위 번호 핀 + 번호별 보정 전/보정본 비교 크롭 + 메모 패널
+before/, after/            보정 전 / 보정본 프리뷰 (긴 변 3000px)
+index.html (+ css/js)      읽기 전용 비교 뷰어 — 더블클릭으로 열림, 인터넷 불필요
+```
+
+번호는 사진마다 1부터이며 뷰어·이미지·텍스트에서 같습니다. 폴더 이름은 호환성을 위해 ASCII(`before/after/feedback`)로 고정되어 있고,
+화면 라벨(`--label-before/--label-after`)과 제목(`--title`)은 readme 와 뷰어에 반영됩니다.
+
 ## 단축키
 
 `←` `→` 사진 이동 · `0` 화면 맞춤 · `1` 나란히 · `2` 겹쳐보기 · `Esc` 닫기 · 메모 저장 `⌘/Ctrl+Enter`
@@ -75,6 +93,7 @@ python3 "/volume1/photos/wedding/photo-feedback/serve.py" --host 0.0.0.0 --no-op
 
 ```
 index.html / style.css / app.js   SPA 본체 (프레임워크·빌드 없음)
+export.js                         업체 전달용 ZIP 내보내기 (Canvas 주석 이미지, store ZIP writer)
 serve.py                          정적 서빙 + GET/PUT /api/feedback (stdlib)
 tools/build_assets.py             원본 → img/thumb|before|after + photos.js (Pillow, numpy)
 data/feedback.json                피드백 (서버 모드에서 자동 생성)

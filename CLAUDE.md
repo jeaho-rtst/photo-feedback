@@ -11,13 +11,34 @@
 |---|---|
 | `index.html` | 마크업. 인덱스 뷰(`#view-index`)와 비교 뷰(`#view-compare`) 두 섹션, 팝업/팝오버. `data-label` 속성이 붙은 요소는 시작 시 `LABELS` 로 치환됨 |
 | `style.css` | 다크 테마 스타일. CSS 변수는 `:root` |
-| `app.js` | 전체 로직. IIFE 하나, 전역 노출 없음. 섹션: 저장소 → 라우팅 → 인덱스 → 뷰어(줌/팬) → 모드 → 피드백 추가/핀/팝오버/목록 → 내보내기/가져오기 → 시작 |
+| `app.js` | 전체 로직. IIFE 하나, 전역 노출 없음. 섹션: 저장소 → 라우팅 → 인덱스 → 뷰어(줌/팬) → 모드 → 피드백 추가/핀/팝오버/목록 → 백업/가져오기 → ZIP 모달 → 시작 |
+| `export.js` | 업체 전달용 ZIP 내보내기. `window.PhotoExport.run({photos, feedback, labels, title, scope, onProgress})` 하나만 노출. store 방식 ZIP writer(CRC32), Canvas 주석 이미지, readme/목록 텍스트 생성. 내보낸 ZIP 에는 포함되지 않는다 |
 | `serve.py` | `ThreadingHTTPServer`. `--root`(기본: 앱 폴더의 상위)를 서빙하고 `/api/feedback` GET/PUT 제공. `/` 는 `/<앱 폴더명>/` 으로 302 |
 | `tools/build_assets.py` | 원본 → `img/thumb|before|after/` 와 `photos.json` + `photos.js`. 크롭된 보정본의 정렬 사각형 계산 |
 | `start-mac.command`, `start-windows.bat` | 더블클릭용 런처. `serve.py` 호출만 함 |
 | `data/feedback.json` | 서버 모드 저장소. `data/feedback.js` 는 같은 내용의 `window.FEEDBACK_DATA = …` (file:// 읽기용). 둘 다 `serve.py` 가 원자적으로 씀 |
 
 생성물(`img/`, `photos.js`, `photos.json`, `data/`)은 `.gitignore` 되어 있다. 리포에는 코드와 문서만 들어간다.
+
+## 내보낸 ZIP (업체 전달용) 의 구조와 읽기 전용 뷰어
+```
+readme.html, readme.txt, 피드백 목록.txt      ← export.js 의 buildTexts() 가 한 데이터에서 셋 다 생성
+index.html, style.css, app.js                 ← 서비스 파일을 fetch 해 그대로 복사 (index.html 에서 export.js 태그만 제거)
+photos.js                                     ← {readonly:true, title, labels, paths:{thumb,before,after}, photos:[선택된 것만]}
+data/feedback.js                              ← window.FEEDBACK_DATA (선택된 사진만)
+img/thumb/, before/, after/                   ← 서비스의 img/thumb, img/before, img/after 를 그대로 복사 (폴더명만 ASCII 로)
+feedback/<이름>.jpg                            ← 피드백 있는 사진만. 보정본(긴 변 2000) + 번호 핀 + 번호별 보정 전/보정본 비교 크롭 + 메모 패널
+```
+- 최상위 폴더를 넣지 않는다 (Windows "압축 풀기" 가 zip 이름 폴더를 또 만들어 이중 폴더가 되므로).
+- 폴더/파일명은 NFC 로 정규화하고 ZIP 헤더에 UTF-8 플래그(0x800)를 세운다. 폴더명이 ASCII 인 이유: macOS 에서 온 NFD 한글과 구형 압축 도구 호환.
+- 읽기 전용은 `photos.js` 의 `readonly:true` 하나로 결정된다. app.js 는 시작 시 `body.readonly` 클래스를 붙이고, 편집 UI 는 전부 `data-edit`
+  속성을 달아 CSS 한 줄(`.readonly [data-edit]{display:none}`)로 숨기며, 상태 변경은 `store.add/update/remove/save` 입구에서 막는다.
+  **새 편집 UI 를 추가하면 반드시 `data-edit` 를 붙일 것.** 읽기 전용에서는 localStorage 도 쓰지 않고 `FEEDBACK_DATA` 만 읽는다.
+- 이미지 경로는 `PATHS`(photos.js 의 `paths`)에서 온다. 서비스에서는 기본값 `img/*`, 내보낸 뷰어에서는 `before/after`.
+- 내보내기는 `fetch` 를 쓰므로 서버 모드에서만 가능하다. file:// 에서는 버튼을 비활성화한다 (`store.setStatus('local')`).
+- 메모리: 이미지는 `Blob` 그대로 ZIP parts 에 넣고(복사 없음) CRC 계산 때만 `arrayBuffer()` 로 한 번 읽는다. 주석 이미지는 직렬로
+  `createImageBitmap → canvas → toBlob → bitmap.close()`. fetch 는 동시 3개·재시도 3회·60초 타임아웃 (NAS 가 느림).
+- 서버 측 이미지 처리(Pillow 등)는 의도적으로 두지 않는다 — NAS 내장 python3 호환이 목표.
 
 ## 실행·검증
 ```bash
@@ -30,6 +51,8 @@ python3 -m py_compile serve.py tools/build_assets.py                  # 문법 �
 오른쪽 pane 클릭 시 `#add-popup` 이 오른쪽에 뜨는지 → 메모 저장 후 `/api/feedback` 에 반영 → 수정/삭제 → 겹쳐보기 전환 →
 `#btn-pins` 토글 → 사진 30장 이상 연속 전환(메모리) → `file://` 로 열었을 때 노란 "이 브라우저에만 저장됨" 상태.
 `confirm()` 을 쓰는 삭제는 자동화에서 `window.confirm = () => true` 로 우회한다.
+내보내기를 바꿨으면: ZIP 을 내려받아 `python3 -c "import zipfile; z=zipfile.ZipFile('x.zip'); print(z.testzip()); [print(i.filename, i.flag_bits & 0x800) for i in z.infolist()]"`
+로 CRC·UTF-8 플래그를 확인하고, 압축을 푼 `index.html` 을 file:// 로 열어 `body.readonly`, 핀/목록 표시, 클릭해도 추가 팝업이 안 뜨는지, `feedback/*.jpg` 를 눈으로 본다.
 
 ## 핵심 설계 (바꾸기 전에 읽을 것)
 - **좌표계**: "캔버스" = 보정 전 사진을 0~1 로 정규화한 공간. 피드백 `x,y` 도 이 기준. 보정본은 `photos.js` 의
@@ -68,7 +91,7 @@ python3 -m py_compile serve.py tools/build_assets.py                  # 문법 �
 - 피드백 JSON 의 기본 구조(`photos[name][] = {id,x,y,text,created,updated}`)와 좌표계. 바꾸면 기존 데이터와 내보내기 소비자가 깨진다.
 
 ## 아이디어 / 남은 일
-- 피드백 전달용 출력(사진마다 핀을 그린 이미지 + 메모 목록을 HTML/PDF 로) — "내보내기" JSON 을 입력으로.
+- 내보내기에 Chrome/Edge `showSaveFilePicker` 스트리밍 저장 추가(수백 장 규모 대비). 지금은 Blob 한 번에 조립.
 - 정렬 점수가 높은 크롭 사진의 수동 미세 조정 UI.
 - Chrome/Edge 의 File System Access API 로 `file://` 모드에서도 json 직접 저장.
 - 첫 피드백을 저장하면 하단 목록이 생기며 사진 영역이 줄어 뷰가 살짝 움직인다 — 목록 영역 높이 고정으로 해결 가능.

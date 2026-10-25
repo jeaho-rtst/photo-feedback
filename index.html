@@ -13,10 +13,11 @@
   <button class="nav-btn" data-view="compare" id="nav-compare">비교 · 피드백</button>
   <div class="nav-spacer"></div>
   <div class="nav-stats" id="nav-stats"></div>
-  <div class="save-status" id="save-status"></div>
-  <button class="nav-sub" id="btn-export">피드백 내보내기 (JSON)</button>
-  <button class="nav-sub" id="btn-import">피드백 가져오기</button>
+  <div class="save-status" id="save-status" data-edit></div>
+  <button class="nav-sub" id="btn-export" data-edit title="피드백 데이터를 JSON 파일로 백업합니다">백업 (JSON)</button>
+  <button class="nav-sub" id="btn-import" data-edit title="백업한 JSON 을 불러옵니다">백업 가져오기</button>
   <input type="file" id="import-file" accept="application/json" hidden>
+  <button class="nav-sub nav-primary" id="btn-zip" data-edit title="업체에 보낼 ZIP (읽기 전용 뷰어 + 피드백 이미지 + 목록)">업체 전달용 내보내기 (ZIP)</button>
 </nav>
 
 <main id="main">
@@ -99,7 +100,7 @@
   <div class="pop-head"><span id="pop-title">피드백</span><button class="x" id="pop-close" title="닫기 (Esc)">×</button></div>
   <div id="pop-view">
     <pre id="pop-text"></pre>
-    <div class="pop-actions">
+    <div class="pop-actions" data-edit>
       <button id="pop-edit">수정</button>
       <button id="pop-delete" class="danger">삭제</button>
     </div>
@@ -113,8 +114,24 @@
   </div>
 </div>
 
+<!-- 업체 전달용 ZIP 내보내기 모달 -->
+<div id="zip-modal" class="modal" hidden>
+  <div class="modal-box">
+    <div class="pop-head"><span>업체 전달용 내보내기 (ZIP)</span><button class="x" id="zip-close" title="닫기">×</button></div>
+    <p class="modal-desc">읽기 전용 비교 뷰어(index.html), <code>feedback/</code> 에 핀·메모를 그려 넣은 이미지, <code>피드백 목록.txt</code>, readme 를 ZIP 하나로 만듭니다.
+      사진과 이미지 처리는 모두 이 브라우저에서 이루어지며, 수십 장이면 1분 안팎 걸립니다.</p>
+    <p id="zip-summary" class="modal-desc"></p>
+    <label class="chk"><input type="radio" name="zip-scope" value="fb" checked> 피드백 있는 사진만 (권장)</label>
+    <label class="chk"><input type="radio" name="zip-scope" value="all"> 전체 사진 포함 (피드백 이미지는 피드백 있는 사진만)</label>
+    <div id="zip-progress" hidden><div class="bar"><div id="zip-bar"></div></div><div id="zip-phase" class="modal-desc"></div></div>
+    <p id="zip-result" class="modal-desc" hidden></p>
+    <div class="pop-actions"><button id="zip-start" class="primary">ZIP 만들어 다운로드</button></div>
+  </div>
+</div>
+
 <script src="photos.js"></script>
 <script src="data/feedback.js"></script>
+<script src="export.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

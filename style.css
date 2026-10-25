@@ -31,6 +31,12 @@ small { color: var(--muted); font-weight: 400; }
 .nav-stats { font-size: 12px; color: var(--muted); padding: 0 4px 8px; }
 .nav-sub { text-align: left; padding: 7px 10px; border-radius: 6px; border: 1px solid var(--line); background: transparent; font-size: 12.5px; }
 .nav-sub:hover { background: var(--panel-2); }
+.nav-primary { margin-top: 10px; border-color: var(--accent); color: var(--accent); font-weight: 600; }
+.nav-primary:disabled { opacity: .45; cursor: not-allowed; }
+.ro-badge { display: inline-block; margin-top: 4px; padding: 1px 8px; border-radius: 999px; background: #3a2f14; color: var(--accent); font-size: 11px; font-weight: 600; }
+/* 읽기 전용 뷰어(내보낸 ZIP): 편집 UI 는 전부 data-edit 로 표시해 두고 여기서 한 번에 숨긴다 */
+.readonly [data-edit] { display: none !important; }
+.readonly .pane { cursor: default; }
 .save-status { font-size: 11px; color: var(--muted); padding: 6px 8px; margin-bottom: 4px; border-radius: 6px; background: var(--panel-2); line-height: 1.45; }
 .save-status.server { color: #8fd694; } .save-status.saving { color: var(--accent); }
 .save-status.error { color: #ff7b72; background: #3a1f1f; } .save-status.local { color: #ffcf7a; }
@@ -130,3 +136,13 @@ output { min-width: 42px; color: var(--text); font-variant-numeric: tabular-nums
 .pop-actions button.primary { background: var(--accent); color: #1a1a1a; border-color: var(--accent); font-weight: 600; }
 .pop-actions button.danger { color: #ff7b72; }
 .pop-actions button.danger:hover { border-color: var(--red); }
+
+/* ---------- 모달 (ZIP 내보내기) ---------- */
+.modal { position: fixed; inset: 0; z-index: 70; background: rgba(0,0,0,.55); display: flex; align-items: center; justify-content: center; }
+.modal-box { width: 440px; max-width: calc(100vw - 32px); background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px 16px; box-shadow: 0 16px 40px rgba(0,0,0,.6); }
+.modal-desc { color: var(--muted); font-size: 12.5px; margin: 6px 0; line-height: 1.5; }
+.modal-desc code { background: var(--panel-2); padding: 0 4px; border-radius: 3px; }
+.modal .chk { display: flex; margin: 6px 0; }
+.bar { height: 8px; background: var(--panel-2); border-radius: 999px; overflow: hidden; margin: 12px 0 4px; }
+.bar div { height: 100%; width: 0; background: var(--accent); transition: width .2s; }
+#zip-result { color: var(--text); }

@@ -9,7 +9,7 @@
 
 실행 예:
   python3 tools/build_assets.py                          # <app 의 상위 폴더>/보정 전, /보정 1차 를 사용
-  python3 tools/build_assets.py --before 원본 --after 보정본 --label-after "2차 보정본"
+  python3 tools/build_assets.py --before 원본 --after 보정본 --label-after "2차 보정본" --title "홍길동·김영희 웨딩"
   python3 tools/build_assets.py --root /path/to/photos --force
 
 이미 생성된 파일은 원본보다 최신이면 건너뛴다 (--force 로 강제 재생성). 처리 도중 끊겨도
@@ -33,6 +33,7 @@ ap.add_argument('--before', default='보정 전', help='보정 전 사진 폴더
 ap.add_argument('--after', default='보정 1차', help='보정본 사진 폴더 이름 (--root 기준)')
 ap.add_argument('--label-before', default='보정 전', help='화면에 표시할 보정 전 라벨')
 ap.add_argument('--label-after', default='1차 보정본', help='화면에 표시할 보정본 라벨')
+ap.add_argument('--title', default='', help='화면 제목·내보내기 ZIP 이름에 쓸 프로젝트 이름 (예: "홍길동·김영희 웨딩")')
 ap.add_argument('--thumb', type=int, default=480, help='섬네일 긴 변 px')
 ap.add_argument('--preview', type=int, default=3000, help='프리뷰 긴 변 px (확대 비교용)')
 ap.add_argument('--workers', type=int, default=4)
@@ -136,6 +137,7 @@ def process(name):
 def write_index(photos):
     data = {'generated_from': {'before': ARGS.before, 'after': ARGS.after},
             'labels': {'before': ARGS.label_before, 'after': ARGS.label_after},
+            'title': ARGS.title,
             'photos': photos}
     with open(os.path.join(APP, 'photos.json'), 'w', encoding='utf-8') as f:
         json.dump(data, f, ensure_ascii=False, indent=1)
